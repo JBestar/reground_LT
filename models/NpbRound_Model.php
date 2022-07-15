@@ -242,6 +242,85 @@ class NpbRound_Model {
 	}
 
 
+	public function registerPbgRound($dbConn, $arrRoundInfo, $arrRoundResult)
+	{
+
+		if(is_null($arrRoundInfo) || is_null($arrRoundResult))
+			return 0;
+		//이미 등록되있으면 패스        
+		if($arrRoundInfo['round_state'] == 1)
+        {
+        	return $arrRoundInfo['round_fid'];
+        }
+
+		if(!array_key_exists("date", $arrRoundResult) || !array_key_exists("date_round", $arrRoundResult))
+			return 0;
+		
+		//날자읽기
+		$strDate = $arrRoundResult['date'];
+		if(empty($strDate) || $strDate !== $arrRoundInfo['round_date'])
+			return 0;
+
+		//일별회차번호 읽기
+		$strRoundNo = $arrRoundResult['date_round'];
+		if(empty($strRoundNo) || $strRoundNo != $arrRoundInfo['round_no'])
+			return 0;
+
+        //유일회차번호
+    	$nRoundFid = $arrRoundResult['times'];
+    	if(empty($nRoundFid) || $nRoundFid < 1)
+			return 0;
+		//유일회차번호 체크
+		$bExistFid = false;
+		if($arrRoundInfo['round_fid'] !=  $nRoundFid){
+			
+			$objRoundDb = $this->getByFid($dbConn, $nRoundFid);
+
+			if(!is_null($objRoundDb)){
+				if(!$this->deleteByFid($dbConn, $arrRoundInfo['round_fid']))	//유일번호가 이미 존재하면 등록된 빈회차 삭제
+					return 0;
+				$bExistFid = true;
+			} 
+			$arrRoundInfo['round_fid'] =  $nRoundFid;
+
+		}
+		
+		$strSql = "UPDATE ".$this->mTableName." SET ";
+		if(!$bExistFid)
+			$strSql.= " round_fid = '" .$arrRoundInfo['round_fid']."', ";
+		else{
+			$strSql.= " round_date = '".$arrRoundInfo['round_date']."', ";
+			$strSql.= " round_num = '".$arrRoundInfo['round_no']."', ";
+			$strSql.= " round_time = NOW(), ";
+		}
+		
+		$strSql.= " round_state = '1', ";		
+		//Round Result
+		if(!array_key_exists('result_1', $arrRoundResult))	//Powerball ODD or Even
+			return 0;
+		$strSql.= " round_result_1 = '" .$arrRoundResult['result_1']."', ";
+		$strSql.= " round_result_2 = '" .$arrRoundResult['result_2']."', ";
+		$strSql.= " round_result_3 = '" .$arrRoundResult['result_3']."', ";
+		$strSql.= " round_result_4 = '" .$arrRoundResult['result_4']."', ";
+		$strSql.= " round_result_5 = '" .$arrRoundResult['result_5']."', ";
+		$strSql.= " round_normal = '" .$arrRoundResult['result_normal']."' ";
+
+		if($bExistFid)
+			$strSql.= " WHERE round_fid = '".$arrRoundInfo['round_fid']."' ";
+		else {
+			$strSql.= " WHERE round_date = '".$arrRoundInfo['round_date']."' ";
+			$strSql.= " AND round_num = '".$arrRoundInfo['round_no']."' ";
+		}
+
+		//자료기지 등록
+		if ($dbConn->query($strSql) === TRUE) {
+			return $arrRoundInfo['round_fid'];
+		}
+
+        return 0;
+
+	}
+
 }
 
 

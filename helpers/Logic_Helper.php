@@ -198,6 +198,127 @@
 		return getCurl($url, $header);
 	}
 	
+
+	function curlLogin_benz($uid, $pwd){
+
+		$url = "https://benz-99.com/login";
+
+		$post = "username=".$uid."&password=".$pwd;
+		
+		$header =  [
+            'Host: benz-99.com',
+			'Connection: keep-alive',
+			'Content-Length: '.strlen($post),
+			'Cache-Control: max-age=0',
+			'Upgrade-Insecure-Requests: 1',
+			'Origin: https://benz-99.com',
+			'Content-Type: application/x-www-form-urlencoded',
+			'User-Agent: Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/102.0.0.0 Safari/537.36',
+			'Accept: */*',
+			'Referer: https://benz-99.com/',
+			'Accept-Encoding: ',
+			'Accept-Language: ko-KR,ko;q=0.9,en-US;q=0.8,en;q=0.7',
+		];
+
+		return getCurl($url, $header, $post);
+	}
+
+	function curlKeep_benz($sessId){
+		// $milliSec = floor(microtime(true) * 1000);
+
+		$url = "https://benz-99.com/ko/gameLive/powerball"; //ko/before
+		// $url.= "?&_=".$milliSec;
+		
+		$header =  [
+            'Host: benz-99.com',
+			'Connection: keep-alive',
+			'Cache-Control: max-age=0',
+			'Upgrade-Insecure-Requests: 1',
+			'User-Agent: Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/102.0.0.0 Safari/537.36',
+			'Accept: */*',
+			'Sec-Fetch-Site: same-origin',
+			'Sec-Fetch-Mode: navigate',
+			'Sec-Fetch-User: ?1',
+			'Sec-Fetch-Dest: document',
+			'sec-ch-ua: ".Not/A)Brand";v="99", "Google Chrome";v="103", "Chromium";v="103"',
+			'sec-ch-ua-mobile: ?0',
+			'sec-ch-ua-platform: "Windows"',
+			'Referer: https://benz-99.com/',
+			'Accept-Encoding: ',
+			'Accept-Language: ko-KR,ko;q=0.9,en-US;q=0.8,en;q=0.7',
+			'Cookie: JSESSIONID='.$sessId.'; loginUrl=/',
+		];
+
+		return getCurl($url, $header);
+	}
+
+	function curlPbg_benz($sessId, $round=null, $bLast=false){
+		$milliSec = floor(microtime(true) * 1000);
+
+		$url = "https://benz-99.com/ko/powerball/liveBetting?"; 
+		if(!is_null($round)){
+
+			$arrRounds = getLastRoundInfos(ROUND_5MIN);
+			
+			$arrRoundInfo = $arrRounds[0];
+
+			$strRoundId = $round['times'];
+			if($arrRoundInfo['round_no'] == $round['date_round']){
+				$strRoundId = $round['times'];
+			} else if($round['date_round'] > $arrRoundInfo['round_no']) {
+				$strRoundId += $arrRoundInfo['round_no'] - $round['date_round'];
+			} else if($round['date_round'] == 1){
+				$strRoundId -= 1 ;
+			} else $strRoundId += 1 ;
+
+			if($bLast)
+				$strRoundId -= 1 ;
+				
+			$strDate = str_replace("-", "", $arrRoundInfo['round_date']);
+
+			$url.= "&round_dateidx=".$strDate;
+			$url.= "&round_no=".$strRoundId;
+
+			echo $url."\r\n";
+		}
+		$url.= "&_=".$milliSec;
+		
+
+		$header =  [
+            'Host: benz-99.com',
+			'Connection: keep-alive',
+			'Cache-Control: max-age=0',
+			'Upgrade-Insecure-Requests: 1',
+			'User-Agent: Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/102.0.0.0 Safari/537.36',
+			'Accept: */*',
+			'X-Requested-With: XMLHttpRequest',
+			'Sec-Fetch-Site: same-origin',
+			'Sec-Fetch-Mode: cors',
+			'Sec-Fetch-Dest: empty',
+			'sec-ch-ua-platform: "Windows"',
+			'Referer: https://benz-99.com/ko/gameLive/powerball',
+			'Accept-Encoding: ',
+			'Accept-Language: ko-KR,ko;q=0.9,en-US;q=0.8,en;q=0.7',
+			'Cookie: JSESSIONID='.$sessId.'; loginUrl=/',
+		];
+
+		return getCurl($url, $header);
+	}
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+	/////////////////////////////////////////////////////
 	//베틱 EOS5분파워볼 회차결과 얻어오기
 	function fetchEosPballRound($strResult)
 	{
@@ -383,6 +504,188 @@
 		return $arrRoundResult;
 	}
 
+	function fetchLogin_benz($strResult, &$sessBenz)
+	{
+		//Session ID
+		$strStart = "JSESSIONID=";
+		$strEnd = ";";
+		$nLastPos = 0;
+		$sessBenz = fetchStr($strResult, $strStart, $strEnd, $nLastPos);
 
+		if(is_null($sessBenz) ){
+			$sessBenz = "";
+			return false;
+		}
+		
+		return true;
+	}
+
+	function fetchKeep_benz($strResult, &$sessBenz)
+	{
+		//Session ID
+		$strStart = "JSESSIONID=";
+		$strEnd = ";";
+		$nLastPos = 0;
+		$sessId = fetchStr($strResult, $strStart, $strEnd, $nLastPos);
+		if(!is_null($sessId) ){
+			$sessBenz = $sessId;
+		}
+
+		$strStart = 'PBG파워볼';
+		//Session ID
+		$nStartPos = strpos($strResult, $strStart);
+		if($nStartPos !== false )
+			return true;
+		else return false;
+	}
+
+	
+	function fetchPbg_benz($strResult, &$sessBenz, &$bLogin)
+	{
+		//Session ID
+		$strStart = "JSESSIONID=";
+		$strEnd = ";";
+		$nLastPos = 0;
+		$sessId = fetchStr($strResult, $strStart, $strEnd, $nLastPos);
+		if(!is_null($sessId) ){
+			$sessBenz = $sessId;
+		}
+
+		$strStart = 'PBG파워볼';
+		//PBG파워볼
+		$nStartPos = strpos($strResult, $strStart);
+		if($nStartPos === false ){
+			$bLogin = false;
+			return null;
+		}
+		$nLastPos = $nStartPos; 
+		//회차번호
+		$strStart = 'id="betRound">';
+		$strEnd = '</span>';
+		$roundNo = fetchStr($strResult, $strStart, $strEnd, $nLastPos);
+		if(is_null($roundNo))
+			return null;
+		
+		$roundNo = trim($roundNo);
+		if(!is_numeric($roundNo))
+			return null;
+		$round['date_round'] = intval($roundNo);
+		
+		//회차아이디
+		$strStart = 'color="blue">';
+		$strEnd = '</font>';
+		$roundId = fetchStr($strResult, $strStart, $strEnd, $nLastPos);
+		if(is_null($roundId))
+			return null;
+		$roundId = trim($roundId);
+		if( !is_numeric($roundId))
+			return null;
+		$round['times'] = intval($roundId);
+		
+		$strStart = 'class="lottery-result';
+		//lottery-result
+		$nStartPos = strpos($strResult, $strStart);
+		if($nStartPos === false )
+			return $round;
+		$nLastPos = $nStartPos; 
+
+		//일반볼 숫자합
+		$strStart = 'class="el-button result el-button--primary is-circle"><span>';
+		$strEnd = '</span>';
+		$result_normal = fetchStr($strResult, $strStart, $strEnd, $nLastPos);
+		$result_normal = trim($result_normal);
+		if(is_null($result_normal))
+			return null;
+		if(!is_numeric($result_normal))
+			return null;
+		$round['result_normal'] = $result_normal;
+
+		//일반볼 홀짝
+		$strStart = 'class="el-button result el-button--primary is-circle"><span>';
+		$strEnd = '</span>';
+		$result_3 = fetchStr($strResult, $strStart, $strEnd, $nLastPos);
+		$result_3 = trim($result_3);
+
+		if(is_null($result_3))
+			return null;
+		else if($result_3 == "홀")
+			$round['result_3'] = 'P';
+		else if($result_3 == "짝")
+			$round['result_3'] = 'B';
+		else return null;
+			
+		//일반볼 언오버
+		$strStart = 'class="el-icon-';
+		$strEnd = '"></i>';
+		$result_4 = fetchStr($strResult, $strStart, $strEnd, $nLastPos);
+		$result_4 = trim($result_4);
+		if(is_null($result_4))
+			return null;
+		else if($result_4 == "bottom")
+			$round['result_4'] = 'P';
+		else if($result_4 == "top")
+			$round['result_4'] = 'B';
+		else return null;
+
+		//일반볼 대중소
+		$strStart = '<span>';
+		$strEnd = '</span>';
+		$result_5 = fetchStr($strResult, $strStart, $strEnd, $nLastPos);
+		$result_5 = trim($result_5);
+		if(is_null($result_5))
+			return null;
+		else if($result_5 == "대")
+			$round['result_5'] = 'L';
+		else if($result_5 == "중")
+			$round['result_5'] = 'M';
+		else if($result_5 == "소")
+			$round['result_5'] = 'S';
+		else return null;
+
+		//파워볼 홀짝
+		$strStart = 'class="el-button result el-button--danger is-circle"><span>';
+		$strEnd = '</span>';
+		$result_1 = fetchStr($strResult, $strStart, $strEnd, $nLastPos);
+		$result_1 = trim($result_1);
+		if(is_null($result_1))
+			return null;
+		else if($result_1 == "홀")
+			$round['result_1'] = 'P';
+		else if($result_1 == "짝")
+			$round['result_1'] = 'B';
+		else return null;
+
+		//파워볼 언오버
+		$strStart = 'class="el-icon-';
+		$strEnd = '"></i>';
+		$result_2 = fetchStr($strResult, $strStart, $strEnd, $nLastPos);
+		$result_2 = trim($result_2);
+		if(is_null($result_2))
+			return null;
+		else if($result_2 == "bottom")
+			$round['result_2'] = 'P';
+		else if($result_2 == "top")
+			$round['result_2'] = 'B';
+			
+		return $round;
+	}
+
+	function fetchStr($strSource, $strStart, $strEnd, &$nLastPos){
+
+		$nStartPos = strpos($strSource, $strStart, $nLastPos);
+		if($nStartPos === false )
+			return null;
+
+		$nStartPos += strlen($strStart);
+		$nEndPos = strpos($strSource, $strEnd, $nStartPos);
+		if($nEndPos === false )
+			return null;
+		
+		$strResult = substr($strSource, $nStartPos, $nEndPos - $nStartPos);
+
+		$nLastPos = $nEndPos;
+		return trim($strResult);
+
+	}
 
 ?>

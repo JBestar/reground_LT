@@ -35,18 +35,30 @@
 		mkdir($tRootDir."/log");
 	}
 	
-    $strDate = date( 'Y-m-d', time());
-	$fLog = fopen($tRootDir."/log/reg_".$strDate, "a") ;
+    $fName = date( 'Y-m-d', time());
+	$fLog = fopen($tRootDir."/log/reg_".$fName, "a") ;
 
 	sleep(1);
 
 	
 	//로직 생성
 	$objServLogic = new ServiceLogic();
-	
+
+	$bPgEnable = true;
 	$bEos5Enable = true;
 	$bCoin5Enable = true;
 	
+	//PBG 회차등록상태 
+	$bPgReg = false; 
+	$bPgEmptyReg = false; 
+
+	$bBenzLogin = false; //로그인상태
+	$sessBenz = "";
+	$roundPbg = null;
+	$bLastRound = true;
+	$benzUid = $arrLionConf['benz_uid'];
+	$benzPwd = $arrLionConf['benz_pwd'];
+
 	//EOS 회차등록상태 
 	$bE5Reg = false; 
 	$bE5EmptyReg = false; 
@@ -59,6 +71,7 @@
 	$orE5 = 0;
 	$orC5 = 0;
 
+	$hPgball = null;
 	$hE5ball = null;
 	$hC5ball = null;
 
@@ -71,17 +84,130 @@
 		
 		//로그파일 
 		if($nHour == 0 && $nMin == 0 && $nSec < 4){
-			if($fLog)
-				fclose($fLog);
 			$strDate = date( 'Y-m-d', $tmNow );
-			$fLog = fopen($tRootDir."/log/reg_".$strDate, "a") ;
-			writeLog($fLog, $logHead."Log File--".$strDate);
+			if($fName !== $strDate){
+				if($fLog)
+					fclose($fLog);
+				$fName = $strDate;
+				$fLog = fopen($tRootDir."/log/reg_".$fName, "a") ;
+				writeLog($fLog, $logHead."Log File--".$fName);
+			}
 		}
 		
 		$nHour = date("G",$tmCurrent);
 		$nMin = date("i",$tmCurrent);
 		$nSec = date("s",$tmCurrent);
 		
+		if($bPgEnable){
+			if(!$bBenzLogin){
+				if($hPgball == null){
+					$hPgball = curl_multi_init();
+					
+					$tContent = "PBG-LOGIN-benz-".$hPgball;
+					writeLog($fLog, $logHead.$tContent);
+					$curl = curlLogin_benz($benzUid, $benzPwd);
+					curl_multi_add_handle($hPgball, $curl);
+				}
+				$result = curlProc($hPgball, $fLog );
+				$arrRegResult = null;
+				if($result != null){
+					$bBenzLogin = fetchLogin_benz($result, $sessBenz);
+					// writeLog($fLog, $result);
+					writeLog($fLog, $bBenzLogin?"PBG-Keep-".$sessBenz:"None-".$sessBenz);
+				}		
+			} else if($bBenzLogin && is_null($roundPbg)){
+				if($hPgball == null){
+					$hPgball = curl_multi_init();
+					
+					$tContent = "PBG-CURRENT-benz-".$hPgball;
+					writeLog($fLog, $logHead.$tContent);
+					$curl = curlPbg_benz($sessBenz);
+					curl_multi_add_handle($hPgball, $curl);
+				}
+				$result = curlProc($hPgball, $fLog );
+				$arrRegResult = null;
+				if($result != null){
+					$roundPbg = fetchPbg_benz($result, $sessBenz, $bBenzLogin);
+					// writeLog($fLog, $result);
+					$lastRound = $objServLogic->getPbgRound($dbLionConn, $roundPbg, true);
+					if(!is_null($lastRound) && $lastRound['round_state'] == 1)
+						$bLastRound = false;
+					else 
+						$bLastRound = true;
+
+					writeLog($fLog, $bBenzLogin?"PBG-Keep-".$sessBenz:"None-".$sessBenz);
+				}		
+			} 
+			else if($bBenzLogin && !$bPgReg && $nMin%5 == 0 && ($nSec>=0 && $nSec <= 50 ) ){
+						
+				if($hPgball == null){
+					$hPgball = curl_multi_init();
+					
+					$tContent = "PBG-REQ-benz-".$hPgball;
+					writeLog($fLog, $logHead.$tContent);
+					$curl = curlPbg_benz($sessBenz, $roundPbg, $bLastRound);
+					curl_multi_add_handle($hPgball, $curl);
+				}
+				$result = curlProc($hPgball, $fLog );
+				$arrRegResult = null;
+				if($result != null){
+					$roundResult = fetchPbg_benz($result, $sessBenz, $bBenzLogin);
+					$arrRegResult = $objServLogic->pbregister_benz($dbLionConn, $roundResult, $bLastRound);
+					if($bLastRound){
+						$arrRegResult = null;
+						$bLastRound = false;
+					}
+				}
+
+				if($arrRegResult != null && $arrRegResult['status'] == "success") {
+					$bPgReg = true;
+					$tContent = "PBG-".$arrRegResult['data']['times'];		
+					writeLog($fLog, $logHead.$tContent);
+
+					if($bMultiReg){
+						
+						$arrRegResult = $objServLogic->pbregister_benz($dbTigerConn, $arrRegResult['data']);
+						writeLog($fLog, $logHead."PBG-tiger-".$arrRegResult['status']);
+					}
+					
+				} else if(!$bPgEmptyReg) {	//빈회차등록
+					
+					$objServLogic->pbregister_empty($dbLionConn);
+					if($bMultiReg){
+						$objServLogic->pbregister_empty($dbTigerConn);
+					}
+					
+					$bPgEmptyReg = true;
+					$tContent = "PBG-empty";
+					writeLog($fLog, $logHead.$tContent);
+
+				}
+
+			} 
+			else if($bBenzLogin && ($bPgReg || $bPgEmptyReg)  && $nMin%5 == 4 && ($nSec>=30 && $nSec <= 50 ) ){
+				
+				if($hPgball == null){
+					$hPgball = curl_multi_init();
+					
+					$tContent = "PBG-KEEP-benz-".$hPgball;
+					writeLog($fLog, $logHead.$tContent);
+					$curl = curlKeep_benz($sessBenz);
+					curl_multi_add_handle($hPgball, $curl);
+				}
+				$result = curlProc($hPgball, $fLog );
+				$arrRegResult = null;
+				if($result != null){
+					$bBenzLogin = fetchKeep_benz($result, $sessBenz);
+					// writeLog($fLog, $result);
+					$bPgReg = false;
+					$bPgEmptyReg = false;
+					$roundPbg = null;
+					writeLog($fLog, $bBenzLogin?"PBG-Keep-".$sessBenz:"None-".$sessBenz);
+				}		
+			} else $hPgball = null;
+
+		}
+
 		
 		if($bEos5Enable){
 
@@ -223,10 +349,9 @@
 
 		}
 		
-		
 		//END
-		if( $hE5ball == null && $hC5ball == null ){
-			sleep(4);
+		if( $hPgball == null && $hE5ball == null && $hC5ball == null ){
+			sleep(3);
 		}
 		// writeLog($fLog, "END");
 
