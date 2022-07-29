@@ -199,23 +199,23 @@
 	}
 	
 
-	function curlLogin_benz($uid, $pwd){
+	function curlLogin_benz($benzInfo){
 
-		$url = "https://benz-99.com/login";
+		$url = $benzInfo['site']."/login";
 
-		$post = "username=".$uid."&password=".$pwd;
+		$post = "username=".$benzInfo['uid']."&password=".$benzInfo['pwd'];
 		
 		$header =  [
-            'Host: benz-99.com',
+            'Host: '.$benzInfo['domain'],
 			'Connection: keep-alive',
 			'Content-Length: '.strlen($post),
 			'Cache-Control: max-age=0',
 			'Upgrade-Insecure-Requests: 1',
-			'Origin: https://benz-99.com',
+			'Origin: '.$benzInfo['site'],
 			'Content-Type: application/x-www-form-urlencoded',
 			'User-Agent: Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/102.0.0.0 Safari/537.36',
 			'Accept: */*',
-			'Referer: https://benz-99.com/',
+			'Referer: '.$benzInfo['site'].'/',
 			'Accept-Encoding: ',
 			'Accept-Language: ko-KR,ko;q=0.9,en-US;q=0.8,en;q=0.7',
 		];
@@ -223,14 +223,14 @@
 		return getCurl($url, $header, $post);
 	}
 
-	function curlKeep_benz($sessId){
+	function curlKeep_benz($benzInfo, $sessId){
 		// $milliSec = floor(microtime(true) * 1000);
 
-		$url = "https://benz-99.com/ko/gameLive/powerball"; //ko/before
+		$url = $benzInfo['site']."/ko/gameLive/powerball"; //ko/before
 		// $url.= "?&_=".$milliSec;
 		
 		$header =  [
-            'Host: benz-99.com',
+            'Host: '.$benzInfo['domain'],
 			'Connection: keep-alive',
 			'Cache-Control: max-age=0',
 			'Upgrade-Insecure-Requests: 1',
@@ -243,7 +243,7 @@
 			'sec-ch-ua: ".Not/A)Brand";v="99", "Google Chrome";v="103", "Chromium";v="103"',
 			'sec-ch-ua-mobile: ?0',
 			'sec-ch-ua-platform: "Windows"',
-			'Referer: https://benz-99.com/',
+			'Referer: '.$benzInfo['site'].'/',
 			'Accept-Encoding: ',
 			'Accept-Language: ko-KR,ko;q=0.9,en-US;q=0.8,en;q=0.7',
 			'Cookie: JSESSIONID='.$sessId.'; loginUrl=/',
@@ -252,10 +252,10 @@
 		return getCurl($url, $header);
 	}
 
-	function curlPbg_benz($sessId, $round=null, $bLast=false){
+	function curlPbg_benz($benzInfo, $sessId, $round=null, $bLast=false){
 		$milliSec = floor(microtime(true) * 1000);
 
-		$url = "https://benz-99.com/ko/powerball/liveBetting?"; 
+		$url = $benzInfo['site']."/ko/powerball/liveBetting?"; 
 		if(!is_null($round)){
 
 			$arrRounds = getLastRoundInfos(ROUND_5MIN);
@@ -285,7 +285,7 @@
 		
 
 		$header =  [
-            'Host: benz-99.com',
+            'Host: '.$benzInfo['domain'],
 			'Connection: keep-alive',
 			'Cache-Control: max-age=0',
 			'Upgrade-Insecure-Requests: 1',
@@ -296,7 +296,7 @@
 			'Sec-Fetch-Mode: cors',
 			'Sec-Fetch-Dest: empty',
 			'sec-ch-ua-platform: "Windows"',
-			'Referer: https://benz-99.com/ko/gameLive/powerball',
+			'Referer: '.$benzInfo['site'].'/ko/gameLive/powerball',
 			'Accept-Encoding: ',
 			'Accept-Language: ko-KR,ko;q=0.9,en-US;q=0.8,en;q=0.7',
 			'Cookie: JSESSIONID='.$sessId.'; loginUrl=/',
@@ -677,6 +677,9 @@
 			return null;
 
 		$nStartPos += strlen($strStart);
+		if(is_null($strEnd) || strlen($strEnd) == 0){
+			return substr($strSource, $nStartPos);
+		}
 		$nEndPos = strpos($strSource, $strEnd, $nStartPos);
 		if($nEndPos === false )
 			return null;

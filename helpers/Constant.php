@@ -23,4 +23,6 @@ define('GAME_COIN3_BALL', 12);
 define('PERMIT_CANCEL', 0);
 define('PERMIT_OK', 1);
 
+define('CONF_BENZ_ACC', 14);
+
 ?>

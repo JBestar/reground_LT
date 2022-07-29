@@ -28,13 +28,38 @@ class ServiceLogic
 	{		
 		//게임배팅시간
 		$objConfig = $this->modelConfSite->getById($dbConn, $confId);
-		if(!is_null($objConfig) && $objConfig->conf_active > 0){
-			return true;
+		if(!is_null($objConfig)){
+			return trim($objConfig->conf_content);
 		}
-		return false;
+		return "";
 		
 	}
 	
+	//배팅사이트 정보얻기
+	public function getSiteInfo($dbConn, $confId)
+	{	
+		$infos = ['site'=>'', 'uid'=>'', 'pwd'=>''];
+		//게임배팅시간
+		$sContent = $this->getSiteConf($dbConn, $confId);
+		$data = explode("|", $sContent);
+		if(count($data) > 2){
+			$strSite = trim($data[0]); 
+			$len = strlen($strSite);
+			if($len > 8 && substr($strSite, $len-1, 1) === "/"){
+				$strSite = substr($strSite, 0, $len-1);
+			}
+			$infos['site'] = $strSite;
+			$infos['uid'] = trim($data[1]); 
+			$infos['pwd'] = trim($data[2]); 
+			$nLastPos = 0;
+			$infos['domain'] = fetchStr($infos['site'], "//", "", $nLastPos);
+
+		}
+		
+		return $infos;
+		
+	}
+
 	//파워볼 빈회차등록
 	public function pbregister_empty($dbConn)
 	{		

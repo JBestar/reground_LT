@@ -56,9 +56,8 @@
 	$sessBenz = "";
 	$roundPbg = null;
 	$bLastRound = true;
-	$benzUid = $arrLionConf['benz_uid'];
-	$benzPwd = $arrLionConf['benz_pwd'];
-
+	$benzInfo = null;
+	
 	//EOS 회차등록상태 
 	$bE5Reg = false; 
 	$bE5EmptyReg = false; 
@@ -101,14 +100,22 @@
 		if($bPgEnable){
 			if(!$bBenzLogin){
 				if($hPgball == null){
-					$hPgball = curl_multi_init();
-					
-					$tContent = "PBG-LOGIN-benz-".$hPgball;
-					writeLog($fLog, $logHead.$tContent);
-					$curl = curlLogin_benz($benzUid, $benzPwd);
-					curl_multi_add_handle($hPgball, $curl);
+					$benzInfo = $objServLogic->getSiteInfo($dbLionConn, CONF_BENZ_ACC);
+
+					if($benzInfo != null && strlen($benzInfo['site']) > 0 
+						&& strlen($benzInfo['uid']) > 0 && strlen($benzInfo['pwd']) > 0){
+						$hPgball = curl_multi_init();
+						
+						$tContent = "PBG-LOGIN-benz-".$hPgball;
+						writeLog($fLog, $logHead.$tContent);
+						
+						$curl = curlLogin_benz($benzInfo);
+						curl_multi_add_handle($hPgball, $curl);
+					}
 				}
-				$result = curlProc($hPgball, $fLog );
+				if($hPgball != null)
+					$result = curlProc($hPgball, $fLog );
+
 				$arrRegResult = null;
 				if($result != null){
 					$bBenzLogin = fetchLogin_benz($result, $sessBenz);
@@ -121,7 +128,7 @@
 					
 					$tContent = "PBG-CURRENT-benz-".$hPgball;
 					writeLog($fLog, $logHead.$tContent);
-					$curl = curlPbg_benz($sessBenz);
+					$curl = curlPbg_benz($benzInfo, $sessBenz);
 					curl_multi_add_handle($hPgball, $curl);
 				}
 				$result = curlProc($hPgball, $fLog );
@@ -145,7 +152,7 @@
 					
 					$tContent = "PBG-REQ-benz-".$hPgball;
 					writeLog($fLog, $logHead.$tContent);
-					$curl = curlPbg_benz($sessBenz, $roundPbg, $bLastRound);
+					$curl = curlPbg_benz($benzInfo, $sessBenz, $roundPbg, $bLastRound);
 					curl_multi_add_handle($hPgball, $curl);
 				}
 				$result = curlProc($hPgball, $fLog );
@@ -191,7 +198,7 @@
 					
 					$tContent = "PBG-KEEP-benz-".$hPgball;
 					writeLog($fLog, $logHead.$tContent);
-					$curl = curlKeep_benz($sessBenz);
+					$curl = curlKeep_benz($benzInfo, $sessBenz);
 					curl_multi_add_handle($hPgball, $curl);
 				}
 				$result = curlProc($hPgball, $fLog );
