@@ -99,6 +99,8 @@
 		
 		if($bPgEnable){
 			if(!$bBenzLogin){
+				writeLog($fLog, $logHead."PBG-LOGIN-benz-");
+
 				if($hPgball == null){
 					$benzInfo = $objServLogic->getSiteInfo($dbLionConn, CONF_BENZ_ACC);
 
@@ -211,7 +213,14 @@
 					$roundPbg = null;
 					writeLog($fLog, $bBenzLogin?"PBG-Keep-".$sessBenz:"None-".$sessBenz);
 				}		
-			} else $hPgball = null;
+			} else {
+				$hPgball = null;
+
+				$dbInfo = $objServLogic->getSiteInfo($dbLionConn, CONF_BENZ_ACC);
+				if($benzInfo['uid'] !== $dbInfo['uid']) {
+					$bBenzLogin = false;
+				} 
+			}
 
 		}
 
