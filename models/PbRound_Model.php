@@ -9,6 +9,7 @@ class PbRound_Model {
 		switch($gameId){
 			case GAME_EOS5_BALL:    $this->mTableName = 'round_eos5';    break;
 			case GAME_COIN5_BALL:   $this->mTableName = 'round_coin5';   break;
+			case GAME_BOGLE_BALL:   $this->mTableName = 'round_bgb';   break;
 			default: break;
 		}
 	}
@@ -197,7 +198,6 @@ class PbRound_Model {
 			$strSql.= ", round_hash = '" .$arrRoundResult['times']."' ";
 
 		} 
-
 
 		$strSql.= " WHERE round_fid = '".$arrRoundInfo['round_fid']."' ";
 		

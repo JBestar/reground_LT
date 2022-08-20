@@ -198,6 +198,12 @@
 		return getCurl($url, $header);
 	}
 	
+	function curlBoglePball(){
+	
+		$url = "http://boglegames.com/game/powerball/ajax.get_live_data.php";
+		$url.= "?t=".time();
+		return getCurl($url);
+	}
 
 	function curlLogin_benz($benzInfo){
 
@@ -689,6 +695,47 @@
 		$nLastPos = $nEndPos;
 		return trim($strResult);
 
+	}
+
+	//보글볼 회차결과
+	function fetchBoglePballRound($strResult)
+	{
+		$arrResult = null; 
+		$objResult = json_decode($strResult, true);
+		
+		if(!is_null($objResult) && array_key_exists("prevGame", $objResult)) {
+			$arrResult = $objResult['prevGame'];
+		}
+
+		return parseBoglePballRound($arrResult);
+
+	}
+
+	function parseBoglePballRound($arrRoundInfo)
+	{
+		
+		if(is_null($arrRoundInfo))
+			return null;
+
+		if(!array_key_exists("round", $arrRoundInfo) || !array_key_exists("date", $arrRoundInfo) )
+			return null;
+
+		$arrRoundResult['date_round'] = $arrRoundInfo['round'];
+		$arrRoundResult['r'] = $arrRoundInfo['round'];
+		
+		$arrRoundResult['date'] = $arrRoundInfo['date'];
+		if(strlen($arrRoundResult['date']) != 10)
+			return null;
+
+		$arrNorBall[0] = $arrRoundInfo['result_n1'];
+		$arrNorBall[1] = $arrRoundInfo['result_n2'];
+		$arrNorBall[2] = $arrRoundInfo['result_n3'];
+		$arrNorBall[3] = $arrRoundInfo['result_n4'];
+		$arrNorBall[4] = $arrRoundInfo['result_n5'];
+		$arrNorBall[5] = $arrRoundInfo['result_pn'];
+		$arrRoundResult['ball'] = $arrNorBall;
+
+		return $arrRoundResult;
 	}
 
 ?>

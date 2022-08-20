@@ -47,6 +47,7 @@
 	$bPgEnable = true;
 	$bEos5Enable = true;
 	$bCoin5Enable = true;
+	$bBgbEnable = true;
 	
 	//PBG 회차등록상태 
 	$bPgReg = false; 
@@ -66,6 +67,10 @@
 	$bC5Reg = false; 
 	$bC5EmptyReg = false; 
 
+	//보글 회차등록상태 
+	$bBbReg = false; 
+	$bBbEmptyReg = false; 
+	
 	$logHead = "";
 	$orE5 = 0;
 	$orC5 = 0;
@@ -73,10 +78,11 @@
 	$hPgball = null;
 	$hE5ball = null;
 	$hC5ball = null;
+	$hBgball = null;
 
 	while(true){
 		$tmCurrent = time(); 
-		$tmNow = $tmCurrent + TM_OFFSET;
+		$tmNow = $tmCurrent ;
 		$nHour = date("G",$tmNow);
 		$nMin = date("i",$tmNow);
 		$nSec = date("s",$tmNow);
@@ -93,13 +99,9 @@
 			}
 		}
 		
-		$nHour = date("G",$tmCurrent);
-		$nMin = date("i",$tmCurrent);
-		$nSec = date("s",$tmCurrent);
-		
 		if($bPgEnable){
 			if(!$bBenzLogin){
-				writeLog($fLog, $logHead."PBG-LOGIN-benz-");
+				// writeLog($fLog, $logHead."PBG-LOGIN-benz-");
 
 				if($hPgball == null){
 					$benzInfo = $objServLogic->getSiteInfo($dbLionConn, CONF_BENZ_ACC);
@@ -365,8 +367,55 @@
 
 		}
 		
+		if($bBgbEnable) {
+			//보글파워볼 회차등록
+			if(!$bBbReg && $nMin%2 == 0 && ($nSec>=0 && $nSec <= 50 ) ){
+
+				if($hBgball == null){
+					$hBgball = curl_multi_init();	
+					$tContent = "BGBALL-REQ-".$hBgball;
+					writeLog($fLog, $logHead.$tContent);
+					$curl = curlBoglePball();
+					curl_multi_add_handle($hBgball, $curl);
+				}
+				$result = curlProc($hBgball, $fLog );
+				$arrRegResult = null;
+				if($result != null){
+					// writeLog($fLog, $result);
+					$roundResult = fetchBoglePballRound($result);
+					$arrRegResult = $objServLogic->bgbregister($dbTigerConn, $roundResult);
+				}
+				if(!is_null($arrRegResult) && $arrRegResult['status'] == "success"){
+					$bBbReg = true;
+
+					$tContent = "BGBALL-".$arrRegResult['data']['r'];		
+					writeLog($fLog, $logHead.$tContent);
+
+					// if($bMultiReg){
+					// 	$arrRegResult = $objServLogic->bgbregister($dbLionConn, $arrRegResult['data']);
+					// 	writeLog($fLog, $logHead."BGBALL-honey-".$arrRegResult['status']);
+					// }
+				} else if(!$bBbEmptyReg) {	//빈회차등록
+					
+					$objServLogic->bgbregister_empty($dbTigerConn);
+					// if($bMultiReg){
+					// 	$objServLogic->bgbregister_empty($dbLionConn);
+					// }
+					
+					$bBbEmptyReg = true;
+					$tContent = "BGBALL-empty";
+					writeLog($fLog, $logHead.$tContent);
+
+				}
+			} else if(($bBbReg || $bBbEmptyReg)  && $nMin%2 == 1 && ($nSec>=30 && $nSec <= 50 ) ){
+				$bBbReg = false;
+				$bBbEmptyReg = false;
+			} else $hBgball = null;
+		}
+
+
 		//END
-		if( $hPgball == null && $hE5ball == null && $hC5ball == null ){
+		if( $hPgball == null && $hE5ball == null && $hC5ball == null && $hBgball == null){
 			sleep(3);
 		}
 		// writeLog($fLog, "END");

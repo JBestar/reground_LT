@@ -11,6 +11,7 @@ class ServiceLogic
 	private $modelPballRound;
 	private $modelEos5Round;
 	private $modelCoin5Round;
+	private $modelBgballRound;
 
 
 	function __construct(){
@@ -21,6 +22,7 @@ class ServiceLogic
 		$this->modelPballRound = new NpbRound_Model();
 		$this->modelEos5Round = new PbRound_Model(GAME_EOS5_BALL);
 		$this->modelCoin5Round = new PbRound_Model(GAME_COIN5_BALL);
+		$this->modelBgballRound = new PbRound_Model(GAME_BOGLE_BALL);
 	}
 
 	//배팅사이트 정보얻기
@@ -100,6 +102,20 @@ class ServiceLogic
 		$arrRoundInfo =  $arrRounds[0];
 		$arrEosRoundInfo = $this->modelCoin5Round->registerEmptyRound($dbConn, $arrRoundInfo);
 	}
+
+	//보글파워볼 빈회차등록
+	public function bgbregister_empty($dbConn)
+	{		
+		//자료기지 체크
+		if(is_null($dbConn)){
+			return ;
+		}
+
+		$arrRoundInfo = getLastRoundInfo(ROUND_2MIN);
+		$arrPbRoundInfo = $this->modelBgballRound->registerEmptyRound($dbConn, $arrRoundInfo);
+		
+	}
+
 	//파워볼 회차등록
 	public function pbregister($dbConn, $arrRoundResult)
 	{		
@@ -291,6 +307,35 @@ class ServiceLogic
 		if($nRegPbId > 0){
 			$arrResult['status'] = "success";
 			$arrResult['data'] = $arrRoundResults;
+		}
+		else $arrResult['status'] = "fail";
+
+		return $arrResult;
+	}
+
+	
+	//보글 파워볼 회차등록
+	public function bgbregister($dbConn, $arrRoundResult)
+	{		
+		//자료기지 체크
+		if(is_null($dbConn)){
+			$arrResult['status'] = "db_error";
+			return $arrResult;
+		}
+
+		if(is_null($arrRoundResult)){
+			$arrResult['status'] = "round_null";
+			return $arrResult;
+		}
+
+		$arrRoundInfo = getLastRoundInfo(ROUND_2MIN);
+		$arrPbRoundInfo = $this->modelBgballRound->registerEmptyRound($dbConn, $arrRoundInfo);
+		
+		$nRegPbId = $this->modelBgballRound->registerRound($dbConn, $arrPbRoundInfo, $arrRoundResult);
+
+		if($nRegPbId > 0){
+			$arrResult['status'] = "success";
+			$arrResult['data'] = $arrRoundResult;
 		}
 		else $arrResult['status'] = "fail";
 
