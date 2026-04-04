@@ -117,7 +117,7 @@ class ServiceLogic
 	}
 
 	//파워볼 회차등록
-	public function pbregister($dbConn, $arrRoundResult)
+	public function pbgregister($dbConn, $arrRoundResult)
 	{		
 		//자료기지 체크
 		if(is_null($dbConn)){
@@ -134,9 +134,7 @@ class ServiceLogic
 		
 		$arrRoundInfo =  $arrRounds[0];
 		$arrPbRoundInfo = $this->modelPballRound->registerEmptyRound($dbConn, $arrRoundInfo);
-		if(!array_key_exists('date', $arrRoundResult)){
-			$arrRoundResult['date'] = $arrRoundInfo['round_date'];
-		}
+
 		$nRegPbId = $this->modelPballRound->registerRound($dbConn, $arrPbRoundInfo, $arrRoundResult);
 
 		if($nRegPbId > 0){
@@ -144,12 +142,52 @@ class ServiceLogic
 			$arrResult['status'] = "success";
 			$arrResult['data'] = $arrRoundResult;
 		}
+		else {
+			$arrResult['status'] = "fail";
+		}
+
+		return $arrResult;
+	}
+		
+	//PBG 회차등록
+	public function pbgregisterlist($dbConn, $arrRoundResults)
+	{		
+		$logHead = "";
+		//자료기지 체크
+		if(is_null($dbConn)){
+			$arrResult['status'] = "db_error";
+			return $arrResult;
+		}
+
+		if(is_null($arrRoundResults)){
+			$arrResult['status'] = "round_null";
+			return $arrResult;
+		}
+
+		$arrRounds = getLastRoundInfos(ROUND_5MIN);
+		
+		$arrRoundInfo =  $arrRounds[0];
+		$arrPbgRoundInfo = $this->modelPballRound->registerEmptyRound($dbConn, $arrRoundInfo);
+		
+		$nRegPbId = $this->modelPballRound->registerRound($dbConn, $arrPbgRoundInfo, $arrRoundResults[0]);
+		
+		$arrPbgLastRoundInfo = $this->modelPballRound->registerEmptyRound($dbConn, $arrRounds[1]);
+		if($nRegPbId > 0)
+			$this->modelPballRound->registerRound($dbConn, $arrPbgLastRoundInfo, $arrRoundResults[1]);
+		else 
+			$this->modelPballRound->registerRound($dbConn, $arrPbgLastRoundInfo, $arrRoundResults[0]);
+
+			
+		if($nRegPbId > 0){
+			$arrResult['status'] = "success";
+			$arrResult['data'] = $arrRoundResults[0];
+		}
 		else $arrResult['status'] = "fail";
 
 		return $arrResult;
 	}
 	//파워볼 회차등록
-	public function pbregister_benz($dbConn, $arrRoundResult, $bLastRound=false)
+	public function pbgregister_benz($dbConn, $arrRoundResult, $bLastRound=false)
 	{		
 		//자료기지 체크
 		if(is_null($dbConn)){
@@ -306,13 +344,43 @@ class ServiceLogic
 
 		if($nRegPbId > 0){
 			$arrResult['status'] = "success";
-			$arrResult['data'] = $arrRoundResults;
+			$arrResult['data'] = $arrRoundResults[0];
 		}
 		else $arrResult['status'] = "fail";
 
 		return $arrResult;
 	}
+	//COIN5분 파워볼 회차등록
+	public function coin5register($dbConn, $arrRoundResult, $fLog)
+	{		
+		$logHead = "";
+		//자료기지 체크
+		if(is_null($dbConn)){
+			$arrResult['status'] = "db_error";
+			return $arrResult;
+		}
 
+		if(is_null($arrRoundResult)){
+			$arrResult['status'] = "round_null";
+			return $arrResult;
+		}
+
+		$arrRounds = getLastRoundInfos(ROUND_5MIN);
+		
+		$arrRoundInfo =  $arrRounds[0];
+		$arrEosRoundInfo = $this->modelCoin5Round->registerEmptyRound($dbConn, $arrRoundInfo);
+		
+		$nRegPbId = $this->modelCoin5Round->registerRound($dbConn, $arrEosRoundInfo, $arrRoundResult);
+
+		if($nRegPbId > 0){
+			
+			$arrResult['status'] = "success";
+			$arrResult['data'] = $arrRoundResult;
+		}
+		else $arrResult['status'] = "fail";
+
+		return $arrResult;
+	}
 	
 	//보글 파워볼 회차등록
 	public function bgbregister($dbConn, $arrRoundResult)

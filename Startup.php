@@ -48,7 +48,7 @@
 	$bEos5Enable = true;
 	$bCoin5Enable = true;
 	$bBgbEnable = true;
-	
+	$bBenzEnable = false;
 	//PBG 회차등록상태 
 	$bPgReg = false; 
 	$bPgEmptyReg = false; 
@@ -56,9 +56,9 @@
 	$bBenzLogin = false; //로그인상태
 	$sessBenz = "";
 	$roundPbg = null;
-	$bLastRound = true;
+	$bLastRound = false;
 	$benzInfo = null;
-	
+	$benzState = true;
 	//EOS 회차등록상태 
 	$bE5Reg = false; 
 	$bE5EmptyReg = false; 
@@ -72,6 +72,7 @@
 	$bBbEmptyReg = false; 
 	
 	$logHead = "";
+	$orPbg = 0;
 	$orE5 = 0;
 	$orC5 = 0;
 
@@ -99,75 +100,107 @@
 			}
 		}
 		
+		$benzState = true;
 		if($bPgEnable){
-			if(!$bBenzLogin){
-				// writeLog($fLog, $logHead."PBG-LOGIN-benz-");
 
-				if($hPgball == null){
-					$benzInfo = $objServLogic->getSiteInfo($dbLionConn, CONF_BENZ_ACC);
+			if($bBenzEnable) {
+				if(!$bBenzLogin){
+					// writeLog($fLog, $logHead."PBG-LOGIN-benz-");
 
-					if($benzInfo != null && strlen($benzInfo['site']) > 0 
-						&& strlen($benzInfo['uid']) > 0 && strlen($benzInfo['pwd']) > 0){
+					if($hPgball == null){
+						$benzInfo = $objServLogic->getSiteInfo($dbLionConn, CONF_BENZ_ACC);
+
+						if($benzInfo != null && strlen($benzInfo['site']) > 0 
+							&& strlen($benzInfo['uid']) > 0 && strlen($benzInfo['pwd']) > 0){
+							$hPgball = curl_multi_init();
+							
+							$tContent = "PBG-LOGIN-benz-".$hPgball;
+							writeLog($fLog, $logHead.$tContent);
+							
+							$curl = curlLogin_benz($benzInfo);
+							curl_multi_add_handle($hPgball, $curl);
+						}
+					}
+					if($hPgball != null)
+						$result = curlProc($hPgball, $fLog, 'PBG');
+
+					$arrRegResult = null;
+					if($result != null){
+						$bBenzLogin = fetchLogin_benz($result, $sessBenz);
+						// writeLog($fLog, $result);
+						writeLog($fLog, $bBenzLogin?"PBG-Keep-".$sessBenz:"None-".$sessBenz);
+					}		
+				} else if($bBenzLogin && is_null($roundPbg)){
+					if($hPgball == null){
 						$hPgball = curl_multi_init();
 						
-						$tContent = "PBG-LOGIN-benz-".$hPgball;
+						$tContent = "PBG-CURRENT-benz-".$hPgball;
 						writeLog($fLog, $logHead.$tContent);
-						
-						$curl = curlLogin_benz($benzInfo);
+						$curl = curlPbg_benz($benzInfo, $sessBenz);
 						curl_multi_add_handle($hPgball, $curl);
 					}
-				}
-				if($hPgball != null)
-					$result = curlProc($hPgball, $fLog );
-
-				$arrRegResult = null;
-				if($result != null){
-					$bBenzLogin = fetchLogin_benz($result, $sessBenz);
-					// writeLog($fLog, $result);
-					writeLog($fLog, $bBenzLogin?"PBG-Keep-".$sessBenz:"None-".$sessBenz);
-				}		
-			} else if($bBenzLogin && is_null($roundPbg)){
-				if($hPgball == null){
-					$hPgball = curl_multi_init();
-					
-					$tContent = "PBG-CURRENT-benz-".$hPgball;
-					writeLog($fLog, $logHead.$tContent);
-					$curl = curlPbg_benz($benzInfo, $sessBenz);
-					curl_multi_add_handle($hPgball, $curl);
-				}
-				$result = curlProc($hPgball, $fLog );
-				$arrRegResult = null;
-				if($result != null){
-					$roundPbg = fetchPbg_benz($result, $sessBenz, $bBenzLogin);
-					// writeLog($fLog, $result);
-					$lastRound = $objServLogic->getPbgRound($dbLionConn, $roundPbg, true);
-					if(!is_null($lastRound) && $lastRound['round_state'] == 1)
-						$bLastRound = false;
-					else 
+					$result = curlProc($hPgball, $fLog, 'PBG');
+					$arrRegResult = null;
+					if($result != null){
+						$roundPbg = fetchPbg_benz($result, $sessBenz, $bBenzLogin);
+						// writeLog($fLog, $result);
+						$lastRound = $objServLogic->getPbgRound($dbLionConn, $roundPbg, true);
+						if(!is_null($lastRound) && $lastRound['round_state'] == 1)
+							$bLastRound = false;
+						else 
 						$bLastRound = true;
 
-					writeLog($fLog, $bBenzLogin?"PBG-Keep-".$sessBenz:"None-".$sessBenz);
-				}		
-			} 
-			else if($bBenzLogin && !$bPgReg && $nMin%5 == 0 && ($nSec>=0 && $nSec <= 50 ) ){
+						writeLog($fLog, $bBenzLogin?"PBG-Keep-".$sessBenz:"None-".$sessBenz);
+					}		
+				} else $benzState = false; 
+			} else $benzState = false;
+			
+			
+			if(!$bPgReg && $nMin%5 == 0 && ($nSec>=0 && $nSec <= 50 ) ){
 						
 				if($hPgball == null){
 					$hPgball = curl_multi_init();
 					
-					$tContent = "PBG-REQ-benz-".$hPgball;
-					writeLog($fLog, $logHead.$tContent);
-					$curl = curlPbg_benz($benzInfo, $sessBenz, $roundPbg, $bLastRound);
-					curl_multi_add_handle($hPgball, $curl);
+					// $orPbg = 0;
+					$orPbg ++;
+					if($orPbg > 5)
+						$orPbg = 1;
+
+					if($bBenzLogin && $orPbg % 5 < 4){
+						$tContent = "PBG-REQ-benz-".$hPgball;
+						writeLog($fLog, $logHead.$tContent);
+						$curl = curlPbg_benz($benzInfo, $sessBenz, $roundPbg, $bLastRound);
+						curl_multi_add_handle($hPgball, $curl);
+					} else if($orPbg % 5 == 2 || $orPbg % 5 == 0 || $orPbg % 5 == 4){
+						$tContent = "PBG-REQ-bpk-".$hPgball;
+						writeLog($fLog, $logHead.$tContent);
+						$curl = curlPbg_bpk(ROUND_5MIN);
+						curl_multi_add_handle($hPgball, $curl);
+					} else {
+						$tContent = "PBG-REQ-bpk2-".$hPgball;
+						writeLog($fLog, $logHead.$tContent);
+						$curl = curlpbg_bpk2(ROUND_5MIN);
+						curl_multi_add_handle($hPgball, $curl);
+					}  				
 				}
-				$result = curlProc($hPgball, $fLog );
+				$result = curlProc($hPgball, $fLog, 'PBG');
 				$arrRegResult = null;
 				if($result != null){
-					$roundResult = fetchPbg_benz($result, $sessBenz, $bBenzLogin);
-					$arrRegResult = $objServLogic->pbregister_benz($dbLionConn, $roundResult, $bLastRound);
-					if($bLastRound){
-						$arrRegResult = null;
-						$bLastRound = false;
-					}
+					if($bBenzLogin && $orPbg % 5 < 4){
+						$roundResult = fetchPbg_benz($result, $sessBenz, $bBenzLogin);
+						$arrRegResult = $objServLogic->pbgregister_benz($dbLionConn, $roundResult, $bLastRound);
+						if($bLastRound){
+							$arrRegResult = null;
+							$bLastRound = false;
+							$orPbg = 1;
+						}
+					} else if($orPbg % 5 == 2 || $orPbg % 5 == 0 || $orPbg % 5 == 4 ){
+						$roundResult = fetchPball_bpk($result);
+						$arrRegResult = $objServLogic->pbgregister($dbLionConn, $roundResult); 
+					} else {
+						$roundResult = fetchPball_bpk2($result);
+						$arrRegResult = $objServLogic->pbgregister($dbLionConn, $roundResult);
+					} 
 				}
 
 				if($arrRegResult != null && $arrRegResult['status'] == "success") {
@@ -176,13 +209,14 @@
 					writeLog($fLog, $logHead.$tContent);
 
 					if($bMultiReg){
-						
-						$arrRegResult = $objServLogic->pbregister_benz($dbTigerConn, $arrRegResult['data']);
+						if($bBenzLogin && $orPbg % 5 < 4)
+							$arrRegResult = $objServLogic->pbgregister_benz($dbTigerConn, $arrRegResult['data']);
+						else 
+							$arrRegResult = $objServLogic->pbgregister($dbTigerConn, $arrRegResult['data']);
 						writeLog($fLog, $logHead."PBG-tiger-".$arrRegResult['status']);
 					}
 					
 				} else if(!$bPgEmptyReg) {	//빈회차등록
-					
 					$objServLogic->pbregister_empty($dbLionConn);
 					if($bMultiReg){
 						$objServLogic->pbregister_empty($dbTigerConn);
@@ -195,34 +229,42 @@
 				}
 
 			} 
-			else if($bBenzLogin && ($bPgReg || $bPgEmptyReg)  && $nMin%5 == 4 && ($nSec>=30 && $nSec <= 50 ) ){
+			else if(($bPgReg || $bPgEmptyReg)  && $nMin%5 == 4 && ($nSec>=30 && $nSec <= 50 ) ){
 				
-				if($hPgball == null){
-					$hPgball = curl_multi_init();
-					
-					$tContent = "PBG-KEEP-benz-".$hPgball;
-					writeLog($fLog, $logHead.$tContent);
-					$curl = curlKeep_benz($benzInfo, $sessBenz);
-					curl_multi_add_handle($hPgball, $curl);
+				if($bBenzEnable){
+					$dbInfo = $objServLogic->getSiteInfo($dbLionConn, CONF_BENZ_ACC);
+					if($benzInfo['uid'] !== $dbInfo['uid']) {
+						$bBenzLogin = false;
+					}
 				}
-				$result = curlProc($hPgball, $fLog );
-				$arrRegResult = null;
-				if($result != null){
-					$bBenzLogin = fetchKeep_benz($result, $sessBenz);
-					// writeLog($fLog, $result);
+
+				if($bBenzLogin){
+					if($hPgball == null){
+						$hPgball = curl_multi_init();
+						
+						$tContent = "PBG-KEEP-benz-".$hPgball;
+						writeLog($fLog, $logHead.$tContent);
+						$curl = curlKeep_benz($benzInfo, $sessBenz);
+						curl_multi_add_handle($hPgball, $curl);
+					}
+					$result = curlProc($hPgball, $fLog, 'PBG');
+					$arrRegResult = null;
+					if($result != null){
+						$bBenzLogin = fetchKeep_benz($result, $sessBenz);
+						// writeLog($fLog, $result);
+						$roundPbg = null;
+						$bPgReg = false;
+						$bPgEmptyReg = false;
+						$orPbg = 0;
+						writeLog($fLog, $bBenzLogin?"PBG-Keep-".$sessBenz:"None-".$sessBenz);
+					}		
+				} else {
 					$bPgReg = false;
 					$bPgEmptyReg = false;
-					$roundPbg = null;
-					writeLog($fLog, $bBenzLogin?"PBG-Keep-".$sessBenz:"None-".$sessBenz);
-				}		
-			} else {
-				$hPgball = null;
-
-				$dbInfo = $objServLogic->getSiteInfo($dbLionConn, CONF_BENZ_ACC);
-				if($benzInfo['uid'] !== $dbInfo['uid']) {
-					$bBenzLogin = false;
-				} 
-			}
+					$orPbg = 0;
+				}
+				
+			} else if(!$benzState) $hPgball = null;
 
 		}
 
@@ -235,34 +277,41 @@
 				if($hE5ball == null){
 					$hE5ball = curl_multi_init();
 
-					// $orE5 = 1;
 					$orE5 ++;
-					if($orE5 > 9)
-						$orE5 = 0;
+					if($orE5 > 3)
+						$orE5 = 1;
 
-					if($orE5 % 2 == 1 ){
-						$tContent = "EOS5-REQ-bepicklist-".$hE5ball;
+					if($orE5 % 5 == 1 ){
+						$tContent = "EOS5-REQ-bbj2-".$hE5ball;
 						writeLog($fLog, $logHead.$tContent);
-						$curl = curlEosPballs(ROUND_5MIN);
+						$curl = curlEosPballs_bbj(ROUND_5MIN);
 						curl_multi_add_handle($hE5ball, $curl);
-					}
-					else{
-						$tContent = "EOS5-REQ-bepick-".$hE5ball;
+					} 
+					else if($orE5 % 5 == 3){
+						$tContent = "EOS5-REQ-bbj1-".$hE5ball;
 						writeLog($fLog, $logHead.$tContent);
-						$curl = curlEosPball(ROUND_5MIN);
+						$curl = curlEosPball_bbj(ROUND_5MIN);
+						curl_multi_add_handle($hE5ball, $curl);
+					} else{
+						$tContent = "EOS5-REQ-bpk2-".$hE5ball;
+						writeLog($fLog, $logHead.$tContent);
+						$curl = curlEosPball_bpk(ROUND_5MIN);
 						curl_multi_add_handle($hE5ball, $curl);
 					}
 				}
-				$result = curlProc($hE5ball, $fLog );
+				$result = curlProc($hE5ball, $fLog, 'EOS5');
 				$arrRegResult = null;
 				if($result != null){
-					if($orE5 % 2 == 1 ){
-						$roundResults = fetchEosPballRounds($result);
+
+					if($orE5 % 5 == 1 ){
+						$roundResults = fetchPballs_bbj($result);
 						$arrRegResult = $objServLogic->eos5registerlist($dbLionConn, $roundResults, $fLog);
-						
 					}
-					else {
-						$roundResult = fetchEosPballRound($result);
+					else if($orE5 % 5 == 3) {
+						$roundResult = fetchPball_bbj($result);
+						$arrRegResult = $objServLogic->eos5register($dbLionConn, $roundResult, $fLog);
+					} else {
+						$roundResult = fetchPball_bpk($result);
 						$arrRegResult = $objServLogic->eos5register($dbLionConn, $roundResult, $fLog);
 					}
 				}
@@ -274,7 +323,6 @@
 					writeLog($fLog, $logHead.$tContent);
 
 					if($bMultiReg){
-						
 						$arrRegResult = $objServLogic->eos5register($dbTigerConn, $arrRegResult['data'], $fLog);
 						writeLog($fLog, $logHead."EOS5-tiger-".$arrRegResult['status']);
 					}
@@ -304,45 +352,57 @@
 		if($bCoin5Enable){
 
 			//Coin5분 파워볼 회차등록
-			if(!$bC5Reg && $nMin%5 == 0 && ($nSec>=0 && $nSec <= 50 ) ){
+			if(!$bC5Reg && $nMin%5 == 0 && ($nSec>=3 && $nSec <= 50 ) ){
 						
 				if($hC5ball == null){
 					$hC5ball = curl_multi_init();
 
-					// $orC5 = 1;
+					// $orC5 = 3;
 					$orC5 ++;
-					if($orC5 > 9)
-						$orC5 = 0;
+					if($orC5 > 3)
+						$orC5 = 1;
 
-					if($orC5 % 2 == 1 ){
-						$tContent = "Coin5-REQ-drscorelist-".$hC5ball;
+					if($orC5 % 4 == 2 ){
+						$tContent = "Coin5-REQ-bpk2-".$hC5ball;
 						writeLog($fLog, $logHead.$tContent);
-						$curl = curlCoinPballs(ROUND_5MIN);
+						$curl = curlCoinPball_bpk2(ROUND_5MIN);
 						curl_multi_add_handle($hC5ball, $curl);
-					}
-					else{
-						$tContent = "Coin5-REQ-drscore-".$hC5ball;
+					} else if($orC5 % 4 == 3 ){
+						$tContent = "Coin5-REQ-down-".$hC5ball;
 						writeLog($fLog, $logHead.$tContent);
-						$curl = curlCoinPball(ROUND_5MIN);
+						$curl = curlCoinPball_down(ROUND_5MIN);
+						curl_multi_add_handle($hC5ball, $curl);
+					} else{
+						$tContent = "Coin5-REQ-bpk1-".$hC5ball;
+						writeLog($fLog, $logHead.$tContent);
+						$curl = curlCoinPball_bpk(ROUND_5MIN);
 						curl_multi_add_handle($hC5ball, $curl);
 					}
 				}
-				$result = curlProc($hC5ball, $fLog );
+				$result = curlProc($hC5ball, $fLog, 'Coin5');
 				$arrRegResult = null;
 				if($result != null){
-					// writeLog($fLog, $result);
-					$roundResults = fetchScoreCoinRound($result);
-					$arrRegResult = $objServLogic->coin5registerlist($dbLionConn, $roundResults, $fLog);
+					if($orC5 % 4 == 2 ){
+						$roundResult = fetchPball_bpk2($result);
+						$arrRegResult = $objServLogic->coin5register($dbLionConn, $roundResult, $fLog);
+					} else if($orC5 % 4 == 3 ){
+						$roundResult = fetchPball_down($result);
+						$arrRegResult = $objServLogic->coin5register($dbLionConn, $roundResult, $fLog);
+					} 
+					else {
+						$roundResult = fetchPball_bpk($result);
+						$arrRegResult = $objServLogic->coin5register($dbLionConn, $roundResult, $fLog);
+					}
 				}
 
 				if($arrRegResult != null && $arrRegResult['status'] == "success") {
 					$bC5Reg = true;
 					
-					$tContent = "Coin5-".$arrRegResult['data'][0]['r'];		
+					$tContent = "Coin5-".$arrRegResult['data']['r'];		
 					writeLog($fLog, $logHead.$tContent);
 
 					if($bMultiReg){
-						$arrRegResult = $objServLogic->coin5registerlist($dbTigerConn, $arrRegResult['data'], $fLog);
+						$arrRegResult = $objServLogic->coin5register($dbTigerConn, $arrRegResult['data'], $fLog);
 						writeLog($fLog, $logHead."Coin5-tiger-".$arrRegResult['status']);
 					}
 					
@@ -378,10 +438,9 @@
 					$curl = curlBoglePball();
 					curl_multi_add_handle($hBgball, $curl);
 				}
-				$result = curlProc($hBgball, $fLog );
+				$result = curlProc($hBgball, $fLog, 'BGBALL');
 				$arrRegResult = null;
 				if($result != null){
-					// writeLog($fLog, $result);
 					$roundResult = fetchBoglePballRound($result);
 					$arrRegResult = $objServLogic->bgbregister($dbTigerConn, $roundResult);
 				}
@@ -416,7 +475,7 @@
 
 		//END
 		if( $hPgball == null && $hE5ball == null && $hC5ball == null && $hBgball == null){
-			sleep(3);
+			sleep(1);
 		}
 		// writeLog($fLog, "END");
 

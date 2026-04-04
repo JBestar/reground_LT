@@ -194,8 +194,8 @@ class PbRound_Model {
 
 		$strSql.= " round_power = '" .$nPowerball."', ";
 		$strSql.= " round_normal = '" .$strNorball."' ";
-		if(array_key_exists('times', $arrRoundResult)){
-			$strSql.= ", round_hash = '" .$arrRoundResult['times']."' ";
+		if(array_key_exists('round_hash', $arrRoundResult)){
+			$strSql.= ", round_hash = '" .$arrRoundResult['round_hash']."' ";
 
 		} 
 

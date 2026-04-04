@@ -2,12 +2,37 @@
 
 class NpbRound_Model {
 
-	private $mTableName = "round_powerball";
+	private $mTableName = "round_pball";
 	
 
 	function __construct()
 	{
 		
+	}
+
+	// Logic_Helper에서 전달되는 round_hash가 "A/B" 같은 형태이거나
+	// 숫자가 아닌 값이면 계산/저장 시 에러/경고가 생길 수 있어 숫자로 정규화한다.
+	private function normalizeRoundHash($roundHash)
+	{
+		if(is_null($roundHash)) return 0;
+		$v = trim((string)$roundHash);
+		if($v === '') return 0;
+
+		// "A/B" 형태인 경우 A/B로 환산
+		if(strpos($v, '/') !== false){
+			$parts = explode('/', $v, 2);
+			if(count($parts) === 2 && is_numeric($parts[0]) && is_numeric($parts[1]) && (float)$parts[1] != 0){
+				return (int)floor(((float)$parts[0]) / ((float)$parts[1]));
+			}
+			// 분모가 0이거나 파싱 실패하면 앞부분만 사용
+			if(is_numeric($parts[0])) return (int)$parts[0];
+		}
+
+		if(is_numeric($v)) return (int)$v;
+
+		// fallback: 숫자만 추출
+		$digits = preg_replace('/[^0-9]/', '', $v);
+		return ($digits === '') ? 0 : (int)$digits;
 	}
 
 	public function getByFid($dbConn, $nRoundFid){
@@ -98,9 +123,10 @@ class NpbRound_Model {
         	$arrRoundInfo['round_fid'] = "10001";        
         }
 
-        $strSql = "INSERT INTO ".$this->mTableName." (round_fid, round_date, round_num, round_time, round_state) ";
+        // round_hash는 NOT NULL이므로 초기값은 0으로 넣는다.
+        $strSql = "INSERT INTO ".$this->mTableName." (round_fid, round_date, round_num, round_time, round_state, round_hash) ";
 		$strSql .= " VALUES ('".$arrRoundInfo['round_fid']."', '".$arrRoundInfo['round_date']."', '";
-		$strSql .= $arrRoundInfo['round_no']."', NOW(), '".$arrRoundInfo['round_state']."' )";
+		$strSql .= $arrRoundInfo['round_no']."', NOW(), '".$arrRoundInfo['round_state']."', '0' )";
 		
 		if ($dbConn->query($strSql) === TRUE) {
 			return $arrRoundInfo;
@@ -112,6 +138,30 @@ class NpbRound_Model {
 	}
 
 	
+	/**
+	 * registerRound 이 0을 줄 때 로그용 원인 문자열 (DB 쿼리 실패·fid 삭제 실패는 구분 못 함)
+	 */
+	public function registerRoundDiagnose($arrRoundInfo, $arrRoundResult)
+	{
+		if(is_null($arrRoundInfo) || is_null($arrRoundResult)) return 'null_arrRoundInfo_or_arrRoundResult';
+		if(isset($arrRoundInfo['round_state']) && $arrRoundInfo['round_state'] == 1) return 'already_done_round_state_1';
+		if(!array_key_exists("date", $arrRoundResult) || !array_key_exists("date_round", $arrRoundResult)) return 'missing_date_or_date_round';
+		$strDate = $arrRoundResult['date'];
+		if(empty($strDate) || $strDate !== $arrRoundInfo['round_date']) {
+			return 'date_mismatch local='.$arrRoundInfo['round_date'].' api='.$strDate;
+		}
+		$strRoundNo = $arrRoundResult['date_round'];
+		if(empty($strRoundNo) || $strRoundNo != $arrRoundInfo['round_no']) {
+			return 'round_no_mismatch local='.$arrRoundInfo['round_no'].' api='.$strRoundNo;
+		}
+		$nRoundFid = $arrRoundResult['times'];
+		if(empty($nRoundFid) || $nRoundFid < 1) return 'times_empty_or_invalid';
+		if(empty($arrRoundResult['ball']) || !is_array($arrRoundResult['ball'])) return 'ball_missing';
+		if(count($arrRoundResult['ball']) != 6) return 'ball_count_'.count($arrRoundResult['ball']);
+
+		return 'sql_fail_or_fid_delete_conflict';
+	}
+
 	public function registerRound($dbConn, $arrRoundInfo, $arrRoundResult)
 	{
 
@@ -141,6 +191,7 @@ class NpbRound_Model {
     	$nRoundFid = $arrRoundResult['times'];
     	if(empty($nRoundFid) || $nRoundFid < 1)
 			return 0;
+
 		//유일회차번호 체크
 		$bExistFid = false;
 		if($arrRoundInfo['round_fid'] !=  $nRoundFid){
@@ -224,6 +275,12 @@ class NpbRound_Model {
 		$strSql.= " round_power = '" .$nPowerball."', ";
 		$strSql.= " round_normal = '" .$strNorball."' ";
 
+		// Logic_Helper에서 만든 round_hash를 함께 저장한다.
+		if(array_key_exists('round_hash', $arrRoundResult)){
+			$nHash = $this->normalizeRoundHash($arrRoundResult['round_hash']);
+			$strSql.= ", round_hash = '".$nHash."' ";
+		}
+
 		if($bExistFid)
 			$strSql.= " WHERE round_fid = '".$arrRoundInfo['round_fid']."' ";
 		else {
@@ -270,6 +327,7 @@ class NpbRound_Model {
     	$nRoundFid = $arrRoundResult['times'];
     	if(empty($nRoundFid) || $nRoundFid < 1)
 			return 0;
+
 		//유일회차번호 체크
 		$bExistFid = false;
 		if($arrRoundInfo['round_fid'] !=  $nRoundFid){
@@ -304,6 +362,12 @@ class NpbRound_Model {
 		$strSql.= " round_result_4 = '" .$arrRoundResult['result_4']."', ";
 		$strSql.= " round_result_5 = '" .$arrRoundResult['result_5']."', ";
 		$strSql.= " round_normal = '" .$arrRoundResult['result_normal']."' ";
+
+		// Logic_Helper에서 만든 round_hash를 함께 저장한다.
+		if(array_key_exists('round_hash', $arrRoundResult)){
+			$nHash = $this->normalizeRoundHash($arrRoundResult['round_hash']);
+			$strSql.= ", round_hash = '".$nHash."' ";
+		}
 
 		if($bExistFid)
 			$strSql.= " WHERE round_fid = '".$arrRoundInfo['round_fid']."' ";

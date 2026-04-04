@@ -145,5 +145,5 @@
       if($fLog)
        fputs($fLog, $tContent);
     }
-    
+
 ?>
