@@ -713,6 +713,71 @@ if (! defined('PBG_REGROUND_COMPAT_KEY')) {
 
 	}
 
+	/**
+	 * 베픽(https://bepick.net) PBG — Tiger DB(round_pball) 전용.
+	 * Lion은 curlPbg_bpk / curlpbg_bpk2(PBG_REGROUND_BASE, 예: pbg-2.com) 유지.
+	 */
+	function curlPbg_bepick($roundMin){
+
+		$milliSec = floor(microtime(true) * 1000);
+
+		$url = "https://bepick.net/live/result/pbgpowerball";
+		$url.= "?_=".$milliSec;
+
+		$header =  [
+            'Host: bepick.net',
+			'Connection: keep-alive',
+			'Cache-Control: max-age=0',
+			'User-Agent: Mozilla/5.0 (Windows NT 6.3; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/102.0.0.0 Safari/537.36',
+			'Accept: */*',
+			'Accept-Encoding: ',
+			'Accept-Language: ko-KR,ko;q=0.9,en-US;q=0.8,en;q=0.7'
+		];
+
+		return getCurl($url, $header);
+
+	}
+
+	function curlpbg_bepick2($roundMin){
+
+		$milliSec = floor(microtime(true) * 1000);
+
+		$url = "https://bepick.net/api/get_pattern/pbgpowerball/daily/fd1/20/";
+
+		$arrRoundInfo = getLastRoundInfo($roundMin);
+
+		$url.= str_replace("-", "", $arrRoundInfo['round_date']);
+		$url.= "?_=".$milliSec;
+
+		$header =  [
+            'Host: bepick.net',
+			'Connection: keep-alive',
+			'Cache-Control: max-age=0',
+			'User-Agent: Mozilla/5.0 (Windows NT 6.3; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/102.0.0.0 Safari/537.36',
+			'Accept: */*',
+			'Accept-Encoding: ',
+			'Accept-Language: ko-KR,ko;q=0.9,en-US;q=0.8,en;q=0.7'
+		];
+
+		return getCurl($url, $header);
+
+	}
+
+	/** 베픽 PBG HTTP 동기 수신(헤더 포함 raw). 실패 시 null */
+	function pbgFetchBepickResponse($roundMin, $usePatternApi){
+		$ch = $usePatternApi ? curlpbg_bepick2($roundMin) : curlPbg_bepick($roundMin);
+		if ($ch === null) {
+			return null;
+		}
+		$raw = curl_exec($ch);
+		$errno = curl_errno($ch);
+		curl_close($ch);
+		if ($errno !== 0 || ! is_string($raw) || $raw === '') {
+			return null;
+		}
+		return $raw;
+	}
+
 	function curlLogin_benz($benzInfo){
 
 		$url = $benzInfo['site']."/login";

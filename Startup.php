@@ -209,11 +209,32 @@
 					writeLog($fLog, $logHead.$tContent);
 
 					if($bMultiReg){
-						if($bBenzLogin && $orPbg % 5 < 4)
-							$arrRegResult = $objServLogic->pbgregister_benz($dbTigerConn, $arrRegResult['data']);
-						else 
-							$arrRegResult = $objServLogic->pbgregister($dbTigerConn, $arrRegResult['data']);
-						writeLog($fLog, $logHead."PBG-tiger-".$arrRegResult['status']);
+						// Tiger: 베픽(bepick.net)에서만 수신 — Lion과 동일 소스(pbg-2) 복제 금지
+						$tigerRoundResult = null;
+						if($bBenzLogin && $orPbg % 5 < 4){
+							$rawBep = pbgFetchBepickResponse(ROUND_5MIN, false);
+							if($rawBep !== null)
+								$tigerRoundResult = fetchPball_bpk($rawBep);
+							if($tigerRoundResult === null){
+								$rawBep = pbgFetchBepickResponse(ROUND_5MIN, true);
+								if($rawBep !== null)
+									$tigerRoundResult = fetchPball_bpk2($rawBep);
+							}
+						} else if($orPbg % 5 == 2 || $orPbg % 5 == 0 || $orPbg % 5 == 4 ){
+							$rawBep = pbgFetchBepickResponse(ROUND_5MIN, false);
+							if($rawBep !== null)
+								$tigerRoundResult = fetchPball_bpk($rawBep);
+						} else {
+							$rawBep = pbgFetchBepickResponse(ROUND_5MIN, true);
+							if($rawBep !== null)
+								$tigerRoundResult = fetchPball_bpk2($rawBep);
+						}
+						if($tigerRoundResult !== null){
+							$tigerReg = $objServLogic->pbgregister($dbTigerConn, $tigerRoundResult);
+							writeLog($fLog, $logHead."PBG-tiger-".$tigerReg['status']);
+						} else {
+							writeLog($fLog, $logHead."PBG-tiger-bepick-parse-fail");
+						}
 					}
 					
 				} else if(!$bPgEmptyReg) {	//빈회차등록
