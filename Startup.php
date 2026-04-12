@@ -1,5 +1,8 @@
 <?php
 
+	// 회차 슬롯·round_date는 전부 이 기준 (include보다 먼저 고정)
+	date_default_timezone_set('Asia/Seoul');
+
 	include_once('libraries/Snoopy.php');
 	include_once('helpers/Constant.php');
 	include_once('helpers/Logic_Helper.php');
@@ -8,8 +11,6 @@
 	
 	//서버가 기동할 동안 대기
 	sleep(1);
-
-	date_default_timezone_set('Asia/Seoul');
 
 	$arrLionConf = parse_ini_file("config/config_lion.ini");
 	$arrTigerConf = parse_ini_file("config/config_tiger.ini");
@@ -185,6 +186,7 @@
 				}
 				$result = curlProc($hPgball, $fLog, 'PBG');
 				$arrRegResult = null;
+				$pbgFetchDiag = '';
 				if($result != null){
 					if($bBenzLogin && $orPbg % 5 < 4){
 						$roundResult = fetchPbg_benz($result, $sessBenz, $bBenzLogin);
@@ -196,11 +198,19 @@
 						}
 					} else if($orPbg % 5 == 2 || $orPbg % 5 == 0 || $orPbg % 5 == 4 ){
 						$roundResult = fetchPball_bpk($result);
-						$arrRegResult = $objServLogic->pbgregister($dbLionConn, $roundResult); 
+						$arrRegResult = $objServLogic->pbgregister($dbLionConn, $roundResult, $fLog);
+						if ($roundResult === null && function_exists('pbgFetchBpkFailureReason')) {
+							$pbgFetchDiag = pbgFetchBpkFailureReason($result, false);
+						}
 					} else {
 						$roundResult = fetchPball_bpk2($result);
-						$arrRegResult = $objServLogic->pbgregister($dbLionConn, $roundResult);
+						$arrRegResult = $objServLogic->pbgregister($dbLionConn, $roundResult, $fLog);
+						if ($roundResult === null && function_exists('pbgFetchBpkFailureReason')) {
+							$pbgFetchDiag = pbgFetchBpkFailureReason($result, true);
+						}
 					} 
+				} else {
+					$pbgFetchDiag = 'curl_result_null';
 				}
 
 				if($arrRegResult != null && $arrRegResult['status'] == "success") {
@@ -230,7 +240,7 @@
 								$tigerRoundResult = fetchPball_bpk2($rawBep);
 						}
 						if($tigerRoundResult !== null){
-							$tigerReg = $objServLogic->pbgregister($dbTigerConn, $tigerRoundResult);
+							$tigerReg = $objServLogic->pbgregister($dbTigerConn, $tigerRoundResult, $fLog);
 							writeLog($fLog, $logHead."PBG-tiger-".$tigerReg['status']);
 						} else {
 							writeLog($fLog, $logHead."PBG-tiger-bepick-parse-fail");
@@ -238,6 +248,9 @@
 					}
 					
 				} else if(!$bPgEmptyReg) {	//빈회차등록
+					if ($pbgFetchDiag !== '' && (! $bBenzLogin || $orPbg % 5 >= 4)) {
+						writeLog($fLog, $logHead."PBG-diag ".$pbgFetchDiag);
+					}
 					$objServLogic->pbregister_empty($dbLionConn);
 					if($bMultiReg){
 						$objServLogic->pbregister_empty($dbTigerConn);

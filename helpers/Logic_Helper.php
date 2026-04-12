@@ -37,6 +37,10 @@ if (! defined('PBG_REGROUND_COMPAT_KEY')) {
 		$dbConn = null;
 		if(existDb($mysqli, $strDbName)){
 			$dbConn= new mysqli($strDbHost, $strDbUser, $strDbPwd, $strDbName);
+			if ($dbConn && ! $dbConn->connect_errno) {
+				// PHP는 Asia/Seoul — MySQL SESSION이 SYSTEM(예: OS +8)이면 NOW()와 날짜 경계가 어긋남
+				$dbConn->query("SET time_zone = '+09:00'");
+			}
 		} 
 
 		return $dbConn;
@@ -968,6 +972,61 @@ if (! defined('PBG_REGROUND_COMPAT_KEY')) {
 		$arrResult = $arrResult['update'];
 
 		return parsePballRound_bpk($arrResult);
+	}
+
+	/**
+	 * fetchPball_bpk / fetchPball_bpk2 가 null을 반환할 때 원인 요약 (로그용, 본문 전체는 남기지 않음)
+	 * @param bool $useBpk2 true면 응답 최상단에 update 키 필요(bpk2 경로)
+	 */
+	function pbgFetchBpkFailureReason($strResult, $useBpk2)
+	{
+		if (! is_string($strResult) || $strResult === '') {
+			return 'raw_empty';
+		}
+		$len = strlen($strResult);
+		$body = pbgHttpResponseBody($strResult);
+		$work = (strpos($body, '{"') !== false) ? $body : $strResult;
+		if (strpos($work, '{"') === false) {
+			return 'no_json_object len=' . $len . ' snip=' . substr(preg_replace('/\s+/', ' ', $strResult), 0, 120);
+		}
+		$nStartPos = strpos($work, '{"');
+		$jsonStr = trim(substr($work, $nStartPos));
+		$arrTop = json_decode($jsonStr, true);
+		if ($arrTop === null && json_last_error() !== JSON_ERROR_NONE) {
+			return 'json_decode_err=' . json_last_error_msg() . ' len=' . $len;
+		}
+		if ($arrTop === null) {
+			return 'json_top_null len=' . $len;
+		}
+		if ($useBpk2) {
+			if (! array_key_exists('update', $arrTop)) {
+				$keys = implode(',', array_slice(array_keys($arrTop), 0, 12));
+
+				return 'bpk2_missing_update keys=' . $keys;
+			}
+			$inner = $arrTop['update'];
+		} else {
+			$inner = $arrTop;
+		}
+		if (! is_array($inner)) {
+			return 'inner_not_array';
+		}
+		$parsed = parsePballRound_bpk($inner);
+		if ($parsed !== null) {
+			return 'parse_ok_unexpected';
+		}
+		$miss = array();
+		foreach (array('round', 'date') as $k) {
+			if (! array_key_exists($k, $inner)) {
+				$miss[] = $k;
+			}
+		}
+		if (count($miss) > 0) {
+			return 'inner_missing_' . implode('_', $miss) . ' keys=' . implode(',', array_slice(array_keys($inner), 0, 14));
+		}
+		$d = isset($inner['date']) ? (string) $inner['date'] : '';
+
+		return 'parsePballRound_bpk_null date_len=' . strlen($d) . ' has_rownum=' . (array_key_exists('rownum', $inner) ? '1' : '0');
 	}
 
 // 외부 응답에서 round_hash에 해당할 가능성이 높은 필드를 찾는다.

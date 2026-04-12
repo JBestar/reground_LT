@@ -162,6 +162,40 @@ class NpbRound_Model {
 		return 'sql_fail_or_fid_delete_conflict';
 	}
 
+	/** registerPbgRound 가 0일 때 로그용 (벤츠 등 result_* 기반 등록) */
+	public function registerPbgRoundDiagnose($arrRoundInfo, $arrRoundResult)
+	{
+		if (is_null($arrRoundInfo) || is_null($arrRoundResult)) {
+			return 'null_arrRoundInfo_or_arrRoundResult';
+		}
+		if (isset($arrRoundInfo['round_state']) && $arrRoundInfo['round_state'] == 1) {
+			return 'already_done_round_state_1';
+		}
+		if (! array_key_exists('date', $arrRoundResult) || ! array_key_exists('date_round', $arrRoundResult)) {
+			return 'missing_date_or_date_round';
+		}
+		$strDate = $arrRoundResult['date'];
+		if (empty($strDate) || $strDate !== $arrRoundInfo['round_date']) {
+			return 'date_mismatch local=' . $arrRoundInfo['round_date'] . ' api=' . $strDate;
+		}
+		$strRoundNo = $arrRoundResult['date_round'];
+		if (empty($strRoundNo) || $strRoundNo != $arrRoundInfo['round_no']) {
+			return 'round_no_mismatch local=' . $arrRoundInfo['round_no'] . ' api=' . $strRoundNo;
+		}
+		$nRoundFid = $arrRoundResult['times'];
+		if (empty($nRoundFid) || $nRoundFid < 1) {
+			return 'times_empty_or_invalid';
+		}
+		if (! array_key_exists('result_1', $arrRoundResult)) {
+			return 'missing_result_1';
+		}
+		if (! array_key_exists('result_normal', $arrRoundResult)) {
+			return 'missing_result_normal';
+		}
+
+		return 'sql_fail_or_fid_delete_conflict';
+	}
+
 	public function registerRound($dbConn, $arrRoundInfo, $arrRoundResult)
 	{
 

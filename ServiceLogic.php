@@ -117,8 +117,10 @@ class ServiceLogic
 	}
 
 	//파워볼 회차등록
-	public function pbgregister($dbConn, $arrRoundResult)
-	{		
+	public function pbgregister($dbConn, $arrRoundResult, $fLog = null)
+	{
+		$arrResult = array();
+
 		//자료기지 체크
 		if(is_null($dbConn)){
 			$arrResult['status'] = "db_error";
@@ -127,6 +129,7 @@ class ServiceLogic
 
 		if(is_null($arrRoundResult)){
 			$arrResult['status'] = "round_null";
+			// 파싱 실패 상세는 Startup 의 PBG-diag( fetch )에 남김 — 중복 방지
 			return $arrResult;
 		}
 
@@ -134,6 +137,12 @@ class ServiceLogic
 		
 		$arrRoundInfo =  $arrRounds[0];
 		$arrPbRoundInfo = $this->modelPballRound->registerEmptyRound($dbConn, $arrRoundInfo);
+
+		if (is_null($arrPbRoundInfo)) {
+			$arrResult['status'] = "fail";
+			$this->pbgregisterDiagLog($fLog, 'PBG-pbgregister empty_round_insert_fail', 'empty_ins');
+			return $arrResult;
+		}
 
 		$nRegPbId = $this->modelPballRound->registerRound($dbConn, $arrPbRoundInfo, $arrRoundResult);
 
@@ -144,9 +153,32 @@ class ServiceLogic
 		}
 		else {
 			$arrResult['status'] = "fail";
+			$diag = $this->modelPballRound->registerRoundDiagnose($arrPbRoundInfo, $arrRoundResult);
+			$this->pbgregisterDiagLog($fLog, 'PBG-pbgregister regfail '.$diag, 'regfail');
 		}
 
 		return $arrResult;
+	}
+
+	/**
+	 * 동일 5분 슬롯에서 같은 유형의 진단 로그는 한 번만 (로그 폭주 방지)
+	 */
+	private function pbgregisterDiagLog($fLog, $message, $tag)
+	{
+		if ($fLog === null || ! function_exists('writeLog')) {
+			return;
+		}
+		static $pbgDiagLogged = array();
+		$slot = intdiv(time(), 300);
+		$key = $slot.'_'.$tag;
+		if (isset($pbgDiagLogged[$key])) {
+			return;
+		}
+		$pbgDiagLogged[$key] = true;
+		if (count($pbgDiagLogged) > 64) {
+			$pbgDiagLogged = array();
+		}
+		writeLog($fLog, $message);
 	}
 		
 	//PBG 회차등록

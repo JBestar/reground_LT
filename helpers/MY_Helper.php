@@ -6,6 +6,7 @@
      //이전회차번호, 날자 계산하는 함수-파워볼, 파워사다리
     function getPbLastRoundInfo(){
 
+      date_default_timezone_set('Asia/Seoul');
       $tmNow = time()+TM_OFFSET;
       $nYear = date("Y",$tmNow);
       $nMonth = date("m",$tmNow);
@@ -32,6 +33,7 @@
      //이전회차번호, 날자 계산하는 함수-키노사다리
     function getKsLastRoundInfo(){
 
+      date_default_timezone_set('Asia/Seoul');
       $tmNow = time()+TM_OFFSET;
       $nYear = date("Y",$tmNow);
       $nMonth = date("m",$tmNow);
@@ -60,6 +62,7 @@
     //이전회차번호, 날자 계산하는 함수-일반
     function getLastRoundInfo($roundMin){
 
+    date_default_timezone_set('Asia/Seoul');
     $tmNow = time();
 
     $nHour = date("G",$tmNow);
@@ -84,6 +87,7 @@
     //이전회차번호, 날자 계산하는 함수-EOS
     function getLastRoundInfos($roundMin){
 
+      date_default_timezone_set('Asia/Seoul');
       $tmNow = time();
       
       $nHour = date("G",$tmNow);
