@@ -18,14 +18,14 @@
 	//자료기지 접속
 	$dbLionConn = connectDb($arrLionConf);
 
-	if ($dbLionConn->connect_errno) {
+	if (! ($dbLionConn instanceof mysqli) || $dbLionConn->connect_errno) {
 	    $dbLionConn = null;
 	}
 
 	$bMultiReg = true;
 	$dbTigerConn = connectDb($arrTigerConf);
 
-	if ($dbTigerConn->connect_errno) {
+	if (! ($dbTigerConn instanceof mysqli) || $dbTigerConn->connect_errno) {
 	    $dbTigerConn = null;
 		$bMultiReg = false;
 	}
@@ -40,6 +40,8 @@
 	$fLog = fopen($tRootDir."/log/reg_".$fName, "a") ;
 
 	sleep(1);
+
+	writeLog($fLog, "BOOT php=".PHP_VERSION." lion=".mysqliDiag($dbLionConn)." tiger=".mysqliDiag($dbTigerConn));
 
 	
 	//로직 생성

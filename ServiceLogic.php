@@ -124,6 +124,7 @@ class ServiceLogic
 		//자료기지 체크
 		if(is_null($dbConn)){
 			$arrResult['status'] = "db_error";
+			$this->pbgregisterDiagLog($fLog, 'PBG-pbgregister db_error conn=null', 'db_null');
 			return $arrResult;
 		}
 
@@ -140,7 +141,13 @@ class ServiceLogic
 
 		if (is_null($arrPbRoundInfo)) {
 			$arrResult['status'] = "fail";
-			$this->pbgregisterDiagLog($fLog, 'PBG-pbgregister empty_round_insert_fail', 'empty_ins');
+			$emptyDiag = $this->modelPballRound->getLastEmptyInsertDiag();
+			$apiBits = ' api_times=' . (isset($arrRoundResult['times']) ? $arrRoundResult['times'] : '');
+			$apiBits .= ' api_date=' . (isset($arrRoundResult['date']) ? $arrRoundResult['date'] : '');
+			$apiBits .= ' api_date_round=' . (isset($arrRoundResult['date_round']) ? $arrRoundResult['date_round'] : '');
+			$apiBits .= ' local_date=' . (isset($arrRoundInfo['round_date']) ? $arrRoundInfo['round_date'] : '');
+			$apiBits .= ' local_no=' . (isset($arrRoundInfo['round_no']) ? $arrRoundInfo['round_no'] : '');
+			$this->pbgregisterDiagLog($fLog, 'PBG-pbgregister empty_round_insert_fail '.$emptyDiag.$apiBits, 'empty_ins');
 			return $arrResult;
 		}
 
@@ -154,7 +161,8 @@ class ServiceLogic
 		else {
 			$arrResult['status'] = "fail";
 			$diag = $this->modelPballRound->registerRoundDiagnose($arrPbRoundInfo, $arrRoundResult);
-			$this->pbgregisterDiagLog($fLog, 'PBG-pbgregister regfail '.$diag, 'regfail');
+			$sqlDiag = $this->modelPballRound->getLastRegisterSqlDiag();
+			$this->pbgregisterDiagLog($fLog, 'PBG-pbgregister regfail '.$diag.($sqlDiag !== '' ? ' '.$sqlDiag : ''), 'regfail');
 		}
 
 		return $arrResult;

@@ -3,11 +3,26 @@
 class NpbRound_Model {
 
 	private $mTableName = "round_pball";
-	
+	/** registerEmptyRound / registerRound 가 DB에서 실패한 직후 원인 (로그용) */
+	private $mLastEmptyInsertDiag = '';
+	private $mLastRegisterSqlDiag = '';
 
 	function __construct()
 	{
 		
+	}
+
+	public function getLastEmptyInsertDiag(){
+		return $this->mLastEmptyInsertDiag;
+	}
+
+	public function getLastRegisterSqlDiag(){
+		return $this->mLastRegisterSqlDiag;
+	}
+
+	private function connFailDiag($dbConn, $prefix){
+		$base = function_exists('mysqliDiag') ? mysqliDiag($dbConn) : 'no_mysqliDiag';
+		return $prefix . ' ' . $base;
 	}
 
 	// Logic_Helper에서 전달되는 round_hash가 "A/B" 같은 형태이거나
@@ -77,10 +92,12 @@ class NpbRound_Model {
 		$strSql = "SELECT * FROM ".$this->mTableName;
     	$strSql.= " ORDER BY round_fid DESC LIMIT 1"; 
 
-    	$objResult = $dbConn->query($strSql);
-
     	$arrResult = null;
-    	if($objResult = $dbConn->query($strSql)){
+    	if (! ($dbConn instanceof mysqli)) {
+    		return null;
+    	}
+    	$objResult = $dbConn->query($strSql);
+    	if($objResult){
 	    	if ($objResult->num_rows > 0) {
 			  	while($arrRow = $objResult->fetch_assoc()) {
 			    	$arrResult = $arrRow;
@@ -104,6 +121,13 @@ class NpbRound_Model {
     }
 
 	public function registerEmptyRound($dbConn, $arrRoundInfo){
+		$this->mLastEmptyInsertDiag = '';
+
+		if (! ($dbConn instanceof mysqli)) {
+			$this->mLastEmptyInsertDiag = $this->connFailDiag($dbConn, 'empty_ins db_not_mysqli');
+			return null;
+		}
+
 		//자료기지체크         
 		$arrRound = $this->getByDate($dbConn, $arrRoundInfo['round_no'], $arrRoundInfo['round_date']);
         
@@ -115,7 +139,10 @@ class NpbRound_Model {
         }
 
         $arrRoundInfo['round_state'] = 0;
-        $arrRound = $this->getLast($dbConn);        
+        $arrRound = $this->getLast($dbConn);
+        $lastFid = (! is_null($arrRound) && isset($arrRound['round_fid'])) ? $arrRound['round_fid'] : 'null';
+        $lastGetErrno = (int) $dbConn->errno;
+        $lastGetErr = str_replace(array("\r", "\n"), ' ', (string) $dbConn->error);
         if(!is_null($arrRound))
         {
         	$arrRoundInfo['round_fid'] = $arrRound['round_fid'] + 1;
@@ -131,6 +158,16 @@ class NpbRound_Model {
 		if ($dbConn->query($strSql) === TRUE) {
 			return $arrRoundInfo;
 		}
+
+		$this->mLastEmptyInsertDiag = $this->connFailDiag($dbConn, 'empty_ins');
+		$this->mLastEmptyInsertDiag .= ' last_fid=' . $lastFid;
+		$this->mLastEmptyInsertDiag .= ' next_fid=' . $arrRoundInfo['round_fid'];
+		$this->mLastEmptyInsertDiag .= ' date=' . (isset($arrRoundInfo['round_date']) ? $arrRoundInfo['round_date'] : '');
+		$this->mLastEmptyInsertDiag .= ' round_no=' . (isset($arrRoundInfo['round_no']) ? $arrRoundInfo['round_no'] : '');
+		if ($lastGetErrno > 0 || $lastGetErr !== '') {
+			$this->mLastEmptyInsertDiag .= ' getLast_errno=' . $lastGetErrno . ' getLast_err=' . $lastGetErr;
+		}
+		$this->mLastEmptyInsertDiag .= ' sql=' . $strSql;
 
 		return null; 
 
@@ -198,7 +235,7 @@ class NpbRound_Model {
 
 	public function registerRound($dbConn, $arrRoundInfo, $arrRoundResult)
 	{
-
+		$this->mLastRegisterSqlDiag = '';
 
 		if(is_null($arrRoundInfo) || is_null($arrRoundResult))
 			return 0;
@@ -327,6 +364,9 @@ class NpbRound_Model {
 			return $arrRoundInfo['round_fid'];
 		
 		}
+
+		$this->mLastRegisterSqlDiag = $this->connFailDiag($dbConn, 'reg_update');
+		$this->mLastRegisterSqlDiag .= ' sql=' . $strSql;
 		
         return 0;
 

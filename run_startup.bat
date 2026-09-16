@@ -1,4 +1,5 @@
 @echo off
+title reground_LT
 chcp 65001 >nul
 cd /d "%~dp0"
 

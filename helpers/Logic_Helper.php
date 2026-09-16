@@ -45,6 +45,28 @@ if (! defined('PBG_REGROUND_COMPAT_KEY')) {
 
 		return $dbConn;
 	}
+
+	/** mysqli 연결 상태 한 줄 (로그용). null/죽은 연결이어도 안전. */
+	function mysqliDiag($dbConn){
+		if (! ($dbConn instanceof mysqli)) {
+			return 'not_mysqli type=' . gettype($dbConn);
+		}
+		$ping = false;
+		try {
+			$ping = @$dbConn->ping();
+		} catch (Exception $e) {
+			$ping = false;
+		}
+		$err = isset($dbConn->error) ? str_replace(array("\r", "\n"), ' ', (string) $dbConn->error) : '';
+		$out = 'ping=' . ($ping ? '1' : '0');
+		$out .= ' connect_errno=' . (int) $dbConn->connect_errno;
+		$out .= ' errno=' . (int) $dbConn->errno;
+		if ($err !== '') {
+			$out .= ' err=' . $err;
+		}
+		$out .= ' thread=' . (int) $dbConn->thread_id;
+		return $out;
+	}
 	
 	function existDb($mysqli, $db_name)
     {
